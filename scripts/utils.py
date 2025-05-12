@@ -3,6 +3,11 @@ from datetime import datetime
 import os
 import pandas as pd
 import logging
+import gspread
+import json
+from google.oauth2.service_account import Credentials
+import ast
+import base64
 
 logger = logging.getLogger(__name__)
 
@@ -95,3 +100,35 @@ def hubspot_push_contacts_to_list(api_key, df, properties_map):
             logger.error(f"Failed to push: {row.get('name', row.get('firstname', ''))}, Error: {response.text}")
 
     return None
+
+def gs_to_df(encoded_key, ss_name, ws_name):
+    """
+    Arguments
+    service_account_key (str): str(os.getenv("SERVICE_ACCOUNT_KEY"))[2:-1]
+    ss_name (str): name of spreadsheet
+    we_name (str): name of worksheet
+
+    Returns
+    links (df): dataframe representation of leads
+    """
+    # Get the encoded key from environment variable
+    encoded_key = encoded_key
+    logger.debug("Retrieved encoded service account key")
+
+    # Decode the key
+    gspread_credentials = json.loads(base64.b64decode(encoded_key).decode('utf-8'))
+    logger.debug("Decoded service account key")
+
+    # Connect to Google Sheets
+    logger.info("Connecting to Google Sheets")
+    try:
+        gc = gspread.service_account_from_dict(gspread_credentials)
+        data = gc.open(ss_name).worksheet(ws_name).get_all_values()
+        links = pd.DataFrame(data[1:], columns=data[0])
+        logger.info(f"Retrieved {len(links)} links from Google Sheets")
+    except Exception as e:
+        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
+        raise
+
+    # Convert to DF, return
+    return links
