@@ -4,11 +4,21 @@ on:
   schedule:
     # Runs at 9 AM and 5 PM UTC every day
     - cron: '0 9,17 * * *'
-  workflow_dispatch:  # Allows manual triggering
+  workflow_dispatch:
+    inputs:
+      run_type:
+        description: 'Type of sync to run'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - test
 
 jobs:
   sync:
     runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.run_type == 'full')
     
     steps:
     - uses: actions/checkout@v3
@@ -30,4 +40,32 @@ jobs:
       env:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      run: python scripts/hs_gs.py 
+      run: python scripts/hs_gs.py
+
+  manual-sync:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_type == 'test'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create logs directory
+      run: mkdir -p logs
+      
+    - name: Run Test Sync
+      env:
+        HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: |
+        echo "Running test sync..."
+        python scripts/hs_gs.py 
