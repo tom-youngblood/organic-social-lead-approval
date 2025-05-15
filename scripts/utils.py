@@ -101,6 +101,54 @@ def hubspot_push_contacts_to_list(api_key, df, properties_map):
 
     return None
 
+def hubspot_bulk_update_property(api_key, url, df, property):
+    """
+    Updates all of the properties in a list.
+
+    Inputs:
+    api_key(STR): Hubspot API Key,
+    url (str): URL of list
+    df (DataFrame): DataFrame of contacts to update
+    property: Property to update
+
+    Returns:
+    None
+    """
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+
+    for _, row in df.iterrows():
+        vid = row.get('vid')
+        if not vid:
+            logger.warning(f"No vid found for row: {row}")
+            continue
+
+        property_value = row.get(property)
+        if property_value is None:
+            logger.warning(f"No value found for property {property} in row: {row}")
+            continue
+
+        update_url = f"https://api.hubapi.com/contacts/v1/contact/vid/{vid}/profile"
+        data = {
+            "properties": [
+                {
+                    "property": property,
+                    "value": property_value
+                }
+            ]
+        }
+
+        response = requests.post(update_url, headers=headers, json=data)
+        
+        if response.status_code == 204:
+            logger.info(f"Successfully updated {property} for contact {vid}")
+        else:
+            logger.error(f"Failed to update {property} for contact {vid}: {response.text}")
+
+    return None
+
 def gs_to_df(encoded_key, ss_name, ws_name):
     """
     Arguments

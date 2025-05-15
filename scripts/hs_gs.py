@@ -7,6 +7,7 @@ import os
 import dotenv
 import base64
 import json
+import time
 
 def main():
     # Configure logging
@@ -24,19 +25,6 @@ def main():
     dotenv.load_dotenv()
     logger.info("Environment loaded")
 
-    # Pull remote engagers from HubSpot Organic Social list
-    hs_api_key = os.environ["HUBSPOT_API_KEY"]
-    list_number = 246
-    logger.info("Pulling Hubspot List")
-    url = f"https://api.hubapi.com/contacts/v1/lists/{list_number}/contacts/all?property=organic_social_outreached&property=hs_linkedin_url&property=firstname&property=lastname&property=company&property=phantombuster_linkedin_headline&property=post_name&property=reaction_type"
-    properties=["organic_social_outreached", "hs_linkedin_url", "firstname", "lastname", "company", "phantombuster_linkedin_headline", "post_name", "reaction_type"]
-    hubspot_engagers = utils.hubspot_fetch_list_contacts(hs_api_key, url, properties).rename(columns={"hs_linkedin_url": "linkedin_url"})
-    logger.info(f"\nGot HubSpot Engagers (list #{list_number}):\n{hubspot_engagers}\n")
-
-    # Filter list
-    non_outreached = hubspot_engagers[hubspot_engagers["organic_social_outreached"].isna()]
-    logger.info(f"Subset -- engagers to outreach to:\n{non_outreached}\n")
-
     # Pull Google Sheets Leads
     ss_name = "Organic Social Pipeline: Outreach Approvals"
     ws_name = "Leads"
@@ -45,10 +33,66 @@ def main():
     gs_leads = utils.gs_to_df(encoded_key, ss_name, ws_name)
     logger.info(f"\nGot Google Sheets Engagers):\n{gs_leads}\n")
 
-    
-    # Push leads to Organic Social List
+    # Pull remote engagers from HubSpot Organic Social list
+    hs_api_key = os.environ["HUBSPOT_API_KEY"]
+    list_number = 246
+    logger.info("Pulling Hubspot list:")
+    url = f"https://api.hubapi.com/contacts/v1/lists/{list_number}/contacts/all?property=organic_social_outreached&property=hs_linkedin_url&property=firstname&property=lastname&property=company&property=phantombuster_linkedin_headline&property=post_name&property=reaction_type"
+    properties=["organic_social_outreached", "hs_linkedin_url", "firstname", "lastname", "company", "phantombuster_linkedin_headline", "post_name", "reaction_type"]
+    hubspot_engagers = utils.hubspot_fetch_list_contacts(hs_api_key, url, properties)
+    logger.info(f"\nGot HubSpot Engagers (list #{list_number}):\n{hubspot_engagers}\n")
 
+    # Get hubspot engagers that are to be updated
+    hubspot_engagers_to_be_updated = hubspot_engagers[hubspot_engagers["organic_social_outreached"].isin(["Yes", "No"])]
+    logger.info(f"Hubspot engagers to be updated:\n{hubspot_engagers_to_be_updated}")
 
+    # Get GS leads that have been updated with valid values
+    updated_leads = gs_leads[gs_leads["organic_social_outreached"].isin(["Yes", "No"])]
+    logger.info(f"Leads in Google Sheet that were recently updated with valid values (Yes/No):\n{updated_leads}\n)")
+
+    # Update GS Leads -- Push changes to HubSpot
+    if not updated_leads.empty:
+        logger.info("Updating HubSpot leads with new stages...")
+        url = f"https://api.hubapi.com/contacts/v1/lists/{list_number}"
+        utils.hubspot_bulk_update_property(hs_api_key, url, updated_leads, "organic_social_outreached")
+    else:
+        logger.info("No leads to update in HubSpot")
+
+    logger.info(f"Waiting 5 seconds for HS to refresh.")
+    time.sleep(5)
+
+    # Get leads that need to be in the Google Sheet (those with empty organic_social_outreached)
+    # Exclude leads that were just updated in HubSpot
+    leads_for_sheet = hubspot_engagers[
+        ((hubspot_engagers["organic_social_outreached"].isna()) | 
+        (hubspot_engagers["organic_social_outreached"] == "") |
+        (hubspot_engagers["organic_social_outreached"] == "None") |
+        (~hubspot_engagers["organic_social_outreached"].isin(["Yes", "No"]))) &
+        (~hubspot_engagers["vid"].isin(updated_leads["vid"]))
+    ]
+    logger.info(f"Leads that need to be in Google Sheet (empty or invalid organic_social_outreached, excluding just updated):\n{leads_for_sheet}\n")
+
+    # Replace GS leads with list ^
+    try:
+        gc = gspread.service_account_from_dict(json.loads(base64.b64decode(encoded_key).decode('utf-8')))
+        worksheet = gc.open(ss_name).worksheet(ws_name)
+        
+        # Clear existing content
+        worksheet.clear()
+        
+        # Write headers
+        worksheet.update(values=[leads_for_sheet.columns.tolist()], range_name='A1')
+        
+        # Write data
+        if not leads_for_sheet.empty:
+            worksheet.update(values=leads_for_sheet.values.tolist(), range_name='A2')
+        
+        logger.info("Successfully updated Google Sheet with leads that need staging")
+    except Exception as e:
+        logger.error(f"Failed to update Google Sheet: {str(e)}")
+        raise
+
+    logger.info("Script completed successfully!")
 
 if __name__ == "__main__":
     main()

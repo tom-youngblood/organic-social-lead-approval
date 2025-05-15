@@ -1,0 +1,33 @@
+name: HubSpot Google Sheets Sync
+
+on:
+  schedule:
+    # Runs at 9 AM and 5 PM UTC every day
+    - cron: '0 9,17 * * *'
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Create logs directory
+      run: mkdir -p logs
+      
+    - name: Run HubSpot Google Sheets Sync
+      env:
+        HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
+        SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
+      run: python scripts/hs_gs.py 
