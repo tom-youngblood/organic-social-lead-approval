@@ -163,20 +163,52 @@ def gs_to_df(encoded_key, ss_name, ws_name):
     encoded_key = encoded_key
     logger.debug("Retrieved encoded service account key")
 
-    # Decode the key
-    gspread_credentials = json.loads(base64.b64decode(encoded_key).decode('utf-8'))
-    logger.debug("Decoded service account key")
-
-    # Connect to Google Sheets
-    logger.info("Connecting to Google Sheets")
     try:
-        gc = gspread.service_account_from_dict(gspread_credentials)
-        data = gc.open(ss_name).worksheet(ws_name).get_all_values()
-        links = pd.DataFrame(data[1:], columns=data[0])
-        logger.info(f"Retrieved {len(links)} links from Google Sheets")
-    except Exception as e:
-        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
-        raise
+        # Remove Python byte string literal format if present
+        if encoded_key.startswith("b'") and encoded_key.endswith("'"):
+            encoded_key = encoded_key[2:-1]
+        elif encoded_key.startswith('b"') and encoded_key.endswith('"'):
+            encoded_key = encoded_key[2:-1]
+            
+        # Remove any quotes if present and clean the string
+        encoded_key = encoded_key.strip('"\' \n\r\t')
+        logger.debug(f"Cleaned key length: {len(encoded_key)}")
+        
+        # Add padding if needed
+        padding = 4 - (len(encoded_key) % 4)
+        if padding != 4:
+            encoded_key += '=' * padding
+        
+        # Decode the key
+        try:
+            decoded_key = base64.b64decode(encoded_key).decode('utf-8')
+            logger.debug("Successfully decoded base64")
+        except Exception as e:
+            logger.error(f"Base64 decode failed: {str(e)}")
+            logger.error("First 50 chars of key: " + encoded_key[:50])
+            raise
 
-    # Convert to DF, return
-    return links
+        # Parse JSON
+        try:
+            gspread_credentials = json.loads(decoded_key)
+            logger.debug("Successfully parsed JSON")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parse failed: {str(e)}")
+            logger.error("First 100 chars of decoded key: " + decoded_key[:100])
+            raise
+
+        # Connect to Google Sheets
+        logger.info("Connecting to Google Sheets")
+        try:
+            gc = gspread.service_account_from_dict(gspread_credentials)
+            data = gc.open(ss_name).worksheet(ws_name).get_all_values()
+            links = pd.DataFrame(data[1:], columns=data[0])
+            logger.info(f"Retrieved {len(links)} links from Google Sheets")
+        except Exception as e:
+            logger.error(f"Failed to connect to Google Sheets: {str(e)}")
+            raise
+
+        return links
+    except Exception as e:
+        logger.error(f"Unexpected error processing service account key: {str(e)}")
+        raise

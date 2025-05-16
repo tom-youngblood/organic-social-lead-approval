@@ -40,7 +40,22 @@ jobs:
       env:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      run: python scripts/hs_gs.py
+      run: |
+        echo "Checking service account key..."
+        echo "Key length: ${#SERVICE_ACCOUNT_KEY}"
+        echo "First 10 chars: ${SERVICE_ACCOUNT_KEY:0:10}..."
+        echo "Last 10 chars: ...${SERVICE_ACCOUNT_KEY: -10}"
+        
+        # Test base64 decoding
+        echo $SERVICE_ACCOUNT_KEY | base64 -d > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+          echo "Base64 validation successful"
+        else
+          echo "Warning: Service account key may not be properly base64 encoded"
+        fi
+        
+        # Run the script
+        python scripts/hs_gs.py
 
   manual-sync:
     runs-on: ubuntu-latest
@@ -67,5 +82,18 @@ jobs:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
       run: |
+        echo "Checking service account key..."
+        echo "Key length: ${#SERVICE_ACCOUNT_KEY}"
+        echo "First 10 chars: ${SERVICE_ACCOUNT_KEY:0:10}..."
+        echo "Last 10 chars: ...${SERVICE_ACCOUNT_KEY: -10}"
+        
+        # Test base64 decoding
+        echo $SERVICE_ACCOUNT_KEY | base64 -d > /dev/null 2>&1
+        if [ $? -eq 0 ]; then
+          echo "Base64 validation successful"
+        else
+          echo "Warning: Service account key may not be properly base64 encoded"
+        fi
+        
         echo "Running test sync..."
         python scripts/hs_gs.py 
