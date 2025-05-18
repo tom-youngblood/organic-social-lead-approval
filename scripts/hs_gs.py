@@ -25,13 +25,34 @@ def main():
     dotenv.load_dotenv()
     logger.info("Environment loaded")
 
+    # Get the encoded key from environment variable
+    encoded_key = str(os.getenv("SERVICE_ACCOUNT_KEY"))[2:-1]
+    logger.debug("Retrieved encoded service account key")
+
+    # Decode the key
+    gspread_credentials = json.loads(base64.b64decode(encoded_key).decode('utf-8'))
+    logger.debug("Decoded service account key")
+
+    # Connect to Google Sheets
+    logger.info("Connecting to Google Sheets")
+    try:
+        gc = gspread.service_account_from_dict(gspread_credentials)
+        logger.info("Successfully connected to Google Sheets")
+    except Exception as e:
+        logger.error(f"Failed to connect to Google Sheets: {str(e)}")
+        raise
+
     # Pull Google Sheets Leads
     ss_name = "Organic Social Pipeline: Outreach Approvals"
     ws_name = "Leads"
     logger.info(f"Pulling info from Spreadsheet: {ss_name}, Worksheet: {ws_name}")
-    encoded_key = str(os.getenv("SERVICE_ACCOUNT_KEY"))[2:-1]
-    gs_leads = utils.gs_to_df(encoded_key, ss_name, ws_name)
-    logger.info(f"\nGot Google Sheets Engagers):\n{gs_leads}\n")
+    try:
+        worksheet = gc.open(ss_name).worksheet(ws_name)
+        gs_leads = pd.DataFrame(worksheet.get_all_records())
+        logger.info(f"\nGot Google Sheets Engagers):\n{gs_leads}\n")
+    except Exception as e:
+        logger.error(f"Failed to fetch data from Google Sheets: {str(e)}")
+        raise
 
     # Pull remote engagers from HubSpot Organic Social list
     hs_api_key = os.environ["HUBSPOT_API_KEY"]
@@ -74,9 +95,6 @@ def main():
 
     # Replace GS leads with list ^
     try:
-        gc = gspread.service_account_from_dict(json.loads(base64.b64decode(encoded_key).decode('utf-8')))
-        worksheet = gc.open(ss_name).worksheet(ws_name)
-        
         # Clear existing content
         worksheet.clear()
         
