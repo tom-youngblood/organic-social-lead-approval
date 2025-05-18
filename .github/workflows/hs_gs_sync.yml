@@ -40,36 +40,7 @@ jobs:
       env:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      run: |
-        echo "Checking environment variables..."
-        if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
-          echo "Error: SERVICE_ACCOUNT_KEY is empty"
-          exit 1
-        fi
-        
-        echo "Checking service account key..."
-        echo "Key length: ${#SERVICE_ACCOUNT_KEY}"
-        
-        # Remove Python byte string wrapper if present
-        if [[ "$SERVICE_ACCOUNT_KEY" == b\'*\' ]]; then
-          echo "Removing Python byte string wrapper..."
-          SERVICE_ACCOUNT_KEY="${SERVICE_ACCOUNT_KEY:2:-1}"
-        fi
-        
-        echo "First 10 chars: ${SERVICE_ACCOUNT_KEY:0:10}..."
-        echo "Last 10 chars: ...${SERVICE_ACCOUNT_KEY: -10}"
-        
-        # Test base64 decoding
-        echo "$SERVICE_ACCOUNT_KEY" | base64 -d > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          echo "Base64 validation successful"
-        else
-          echo "Warning: Service account key may not be properly base64 encoded"
-          exit 1
-        fi
-        
-        # Run the script
-        python scripts/hs_gs.py
+      run: python scripts/hs_gs.py
 
   manual-sync:
     runs-on: ubuntu-latest
@@ -95,33 +66,4 @@ jobs:
       env:
         HUBSPOT_API_KEY: ${{ secrets.HUBSPOT_API_KEY }}
         SERVICE_ACCOUNT_KEY: ${{ secrets.SERVICE_ACCOUNT_KEY }}
-      run: |
-        echo "Checking environment variables..."
-        if [ -z "$SERVICE_ACCOUNT_KEY" ]; then
-          echo "Error: SERVICE_ACCOUNT_KEY is empty"
-          exit 1
-        fi
-        
-        echo "Checking service account key..."
-        echo "Key length: ${#SERVICE_ACCOUNT_KEY}"
-        
-        # Remove Python byte string wrapper if present
-        if [[ "$SERVICE_ACCOUNT_KEY" == b\'*\' ]]; then
-          echo "Removing Python byte string wrapper..."
-          SERVICE_ACCOUNT_KEY="${SERVICE_ACCOUNT_KEY:2:-1}"
-        fi
-        
-        echo "First 10 chars: ${SERVICE_ACCOUNT_KEY:0:10}..."
-        echo "Last 10 chars: ...${SERVICE_ACCOUNT_KEY: -10}"
-        
-        # Test base64 decoding
-        echo "$SERVICE_ACCOUNT_KEY" | base64 -d > /dev/null 2>&1
-        if [ $? -eq 0 ]; then
-          echo "Base64 validation successful"
-        else
-          echo "Warning: Service account key may not be properly base64 encoded"
-          exit 1
-        fi
-        
-        echo "Running test sync..."
-        python scripts/hs_gs.py 
+      run: python scripts/hs_gs.py 
