@@ -50,6 +50,7 @@ def main():
         worksheet = gc.open(ss_name).worksheet(ws_name)
         gs_leads = pd.DataFrame(worksheet.get_all_records())
         logger.info(f"\nGot Google Sheets Engagers):\n{gs_leads}\n")
+        logger.info(f"\nGoogle Sheets engagers with their stages:\n{gs_leads[['vid', 'organic_social_outreached']]}")
     except Exception as e:
         logger.error(f"Failed to fetch data from Google Sheets: {str(e)}")
         raise
@@ -64,11 +65,13 @@ def main():
     logger.info(f"\nGot HubSpot Engagers (list #{list_number}):\n{hubspot_engagers}\n")
 
     # Get hubspot engagers that are to be updated
-    hubspot_engagers_to_be_updated = hubspot_engagers[hubspot_engagers["organic_social_outreached"].isin(["Yes", "No"])]
+    hubspot_engagers_to_be_updated = hubspot_engagers[~hubspot_engagers["organic_social_outreached"].str.lower().isin(["yes", "no"])]
     logger.info(f"Hubspot engagers to be updated:\n{hubspot_engagers_to_be_updated}")
 
     # Get GS leads that have been updated with valid values
-    updated_leads = gs_leads[gs_leads["organic_social_outreached"].isin(["Yes", "No"])]
+    updated_leads = gs_leads[gs_leads["organic_social_outreached"].str.lower().isin(["yes", "no"])]
+    # Convert values to proper case for HubSpot
+    updated_leads["organic_social_outreached"] = updated_leads["organic_social_outreached"].str.lower().map({"yes": "Yes", "no": "No"})
     logger.info(f"Leads in Google Sheet that were recently updated with valid values (Yes/No):\n{updated_leads}\n)")
 
     # Update GS Leads -- Push changes to HubSpot
