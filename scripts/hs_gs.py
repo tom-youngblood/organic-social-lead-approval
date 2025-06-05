@@ -50,7 +50,12 @@ def main():
         worksheet = gc.open(ss_name).worksheet(ws_name)
         gs_leads = pd.DataFrame(worksheet.get_all_records())
         logger.info(f"\nGot Google Sheets Engagers):\n{gs_leads}\n")
-        logger.info(f"\nGoogle Sheets engagers with their stages:\n{gs_leads[['vid', 'organic_social_outreached']]}")
+        if gs_leads.empty or not set(['vid', 'organic_social_outreached']).issubset(gs_leads.columns):
+            logger.info("Google Sheet is empty or missing expected columns. Re-creating dataframe.")
+            gs_leads = pd.DataFrame(columns=["vid", "organic_social_outreached", "hs_linkedin_url", "firstname", "lastname", "company", "phantombuster_linkedin_headline", "post_name", "reaction_type"])
+
+        else:
+            logger.info(f"\nGoogle Sheets engagers with their stages:\n{gs_leads[['vid', 'organic_social_outreached']]}")
     except Exception as e:
         logger.error(f"Failed to fetch data from Google Sheets: {str(e)}")
         raise
